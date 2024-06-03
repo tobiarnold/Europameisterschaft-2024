@@ -113,4 +113,4 @@ def display_table():
     ''', additional_text=additional_text, table=df_final_html, fig_html=fig_html)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()
