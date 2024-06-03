@@ -1,6 +1,9 @@
 from flask import Flask, render_template_string
 import pandas as pd
 import requests
+from io import StringIO  
+import plotly.express as px
+import plotly.io as pio
 
 app = Flask(__name__)
 
@@ -9,18 +12,20 @@ def display_table():
     # Wettquoten holen
     url1 = "https://www.wettbasis.com/em/em-wetten"
     r1 = requests.get(url1)
-    df_list1 = pd.read_html(r1.text)
+    df_list1 = pd.read_html(StringIO(r1.text))  
     df1 = df_list1[1]
     # Spalten umbenennen
-    df1 = df1.rename(columns={"Unnamed: 0": "Länder", "Unnamed: 1": "bet365", "Unnamed: 2": "Oddset",
-                              "Unnamed: 3": "bwin", "Unnamed: 4": "Betano", "Unnamed: 5": "bet-at-home",
-                              "Unnamed: 6": "Interwetten"})
+    df1=df1.rename(columns={"Unnamed: 0": "Länder", "Unnamed: 1": "bet365", "Unnamed: 2":"Betano",
+                      "Unnamed: 3":"Neobet","Unnamed: 4":"bwin","Unnamed: 5":"Oddset",
+                      "Unnamed: 6":"Winamax","Unnamed: 7":"Happybet",
+                     "Unnamed: 8":"sunmaker","Unnamed: 9":"Bet3000",
+                     "Unnamed: 10":"bet-at-home"})
     # Durchschnitt der Wettquoten ermitteln
     df1["Durchschnitt Wettquoten"] = df1.select_dtypes(include="number").mean(axis=1).round(2)
     # FIFA Ranking holen
     url2 = "https://www.betinf.com/fifa_ranking.htm"
     r2 = requests.get(url2)
-    df_list2 = pd.read_html(r2.text)
+    df_list2 = pd.read_html(StringIO(r2.text))  
     df2 = df_list2[0]
     # Umbennen der Teams ins deutsche
     df2["Team"] = df2["Team"].replace({
@@ -48,16 +53,33 @@ def display_table():
         (df_join["Durchschnitt Wettquoten in %"] * gewichtung_wetten)+ (df_join["Rang in %"] * gewichtung_fifa_ranking)).round(2)
     # Ausgewählte Spalten selektieren und sortieren
     df_join =df_join.rename(columns={"Rank": "FIFA Rang"})
-    df_final = df_join[["Länder", "bet365", "Oddset", "bwin", "Betano", "bet-at-home", "Interwetten",
-                        "Durchschnitt Wettquoten", "FIFA Rang", "Gewichtetes Ranking in %"]]
+    df_final = df_join[["Länder", "Durchschnitt Wettquoten", "FIFA Rang", "Gewichtetes Ranking in %"]]
     df_final = df_final.sort_values(by="Gewichtetes Ranking in %", ascending=False).reset_index(drop=True)
+    df_graph = df_final.sort_values(by="Gewichtetes Ranking in %", ascending=True).reset_index(drop=True)
     # Dataframe zu HTML
     df_final_html = df_final.to_html(classes="table table-striped", index=False)
-    #Text
+    # Grafik
+    fig = px.bar(
+        df_graph, 
+        x="Gewichtetes Ranking in %", 
+        y="Länder", 
+        orientation="h", 
+        title="Ranking anhand der Wettquoten und des FIFA Rankings",
+        color="Gewichtetes Ranking in %",  
+        color_continuous_scale="Viridis")
+    fig.update_layout(
+        xaxis_title="Gewichtetes Ranking in %",
+        yaxis_title="Länder",
+        margin=dict(l=100, r=20, t=50, b=50),
+        coloraxis_showscale=False) 
+    config = {"displayModeBar": False} 
+    fig_html = pio.to_html(fig, full_html=False, config=config)
+    # Text
     additional_text = """
-    <p>- Annahme Wettquoten sind dynamischer und Aussagekräftiger (Gewichtung 80%)</p>
-    <p>- FIFA Ranking (Gewichtung 20%)</p>
-    <p>- Gewichtetes Ranking in % gibt die Wahrschleichkeit an, dass ein Land Europameister wird</p>
+    <p style="margin-top: 12px;">Das Modell berechnet anhand der aktuelllen Wettqouten und des FIFA Rankings die Wahrscheinlichkeit, mit der ein Land Europameister wird.</p>
+    <p>● Annahme Wettquoten sind dynamischer und Aussagekräftiger (Gewichtung 80%)</p>
+    <p>● FIFA Ranking (Gewichtung 20%)</p>
+    <p style="margin-bottom: 14px;">● Gewichtetes Ranking in % gibt die Wahrscheinlichkeit an, dass ein Land Europameister wird</p>
     """
     # Rendering
     return render_template_string('''
@@ -70,21 +92,25 @@ def display_table():
         <!-- Bootstrap CSS -->
         <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
         <style>
-          th {
-            text-align: left;
-          }
+          th {text-align: left;}
+          p {margin-bottom: 3px;}
         </style>
       </head>
       <body>
         <div class="container">
-          <h1 class="mt-5">Europameisterschaft 2024</h1>
+          <h1 class="mt-5">Welches Land wird Europameister 2024?</h1>
           {{ additional_text|safe }}                      
           {{ table|safe }}
+          <div>{{ fig_html|safe }}</div>
+          <div style="margin-top: 20px;">
+          <a href="https://inside.fifa.com/fifa-world-ranking/men">FIFA Ranking</a>
+           <br>                                               
+        <i>Die Wettquoten stammen unter anderen von folgenden Anbietern: bet365, Betano, Neobet, bwin, Oddset, Winamax, Happybet, sunmaker, Bet3000, bet-at-home.</i>
+    </div>
         </div>
       </body>
     </html>
-    ''', additional_text=additional_text, table=df_final_html)
+    ''', additional_text=additional_text, table=df_final_html, fig_html=fig_html)
 
 if __name__ == '__main__':
     app.run(debug=True)
-
