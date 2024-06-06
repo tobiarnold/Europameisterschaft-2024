@@ -1,1 +1,3 @@
 # Flask App zur Europameisterschaft 2024
+Takes up to a minute for the server to boot up as it is hosted free of charge...
+https://europameisterschaft-2024.onrender.com/
