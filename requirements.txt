@@ -4,3 +4,4 @@ Pandas
 Plotly
 Requests
 lxml
+html5lib
