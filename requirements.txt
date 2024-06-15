@@ -4,5 +4,3 @@ Pandas
 Plotly
 Requests
 lxml
-html5lib
-beautifulsoup4
